@@ -1,0 +1,867 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* === Seasonal Theme Variables === */
+:root {
+  /* Spring (default) */
+  --bg: #fef9f4;
+  --sidebar-bg: #fff5f5;
+  --toolbar-bg: #fff0f0;
+  --border: #f0d4d4;
+  --accent: #e8729a;
+  --accent-hover: #d4508a;
+  --text: #4a3040;
+  --text-light: #8a6070;
+  --btn-bg: #fce4ec;
+  --btn-border: #f0b0c0;
+  --submenu-bg: #fff0f5;
+  --canvas-bg: #fffcfa;
+  --handle-color: #e8729a;
+  --season-emoji: '🌸';
+}
+
+[data-season="summer"] {
+  --bg: #f0faf8;
+  --sidebar-bg: #e8f8f5;
+  --toolbar-bg: #e0f7f4;
+  --border: #b0e0d8;
+  --accent: #26a69a;
+  --accent-hover: #00897b;
+  --text: #1a3a35;
+  --text-light: #5a8a80;
+  --btn-bg: #e0f2f1;
+  --btn-border: #a0d8d0;
+  --submenu-bg: #e8f5f3;
+  --canvas-bg: #fafffd;
+  --handle-color: #26a69a;
+  --season-emoji: '🌊';
+}
+
+[data-season="autumn"] {
+  --bg: #fdf8f0;
+  --sidebar-bg: #fef5e8;
+  --toolbar-bg: #fdf0e0;
+  --border: #e8d0a8;
+  --accent: #e67e22;
+  --accent-hover: #d35400;
+  --text: #4a3020;
+  --text-light: #8a6840;
+  --btn-bg: #fdebd0;
+  --btn-border: #f0c8a0;
+  --submenu-bg: #fef2e0;
+  --canvas-bg: #fffdf8;
+  --handle-color: #e67e22;
+  --season-emoji: '🍁';
+}
+
+[data-season="winter"] {
+  --bg: #f4f8fc;
+  --sidebar-bg: #edf4fa;
+  --toolbar-bg: #e8f0f8;
+  --border: #c0d8e8;
+  --accent: #5c7cba;
+  --accent-hover: #3a5a9a;
+  --text: #2a3040;
+  --text-light: #6080a0;
+  --btn-bg: #e0eaf4;
+  --btn-border: #b0c8e0;
+  --submenu-bg: #e8f0f8;
+  --canvas-bg: #fafcff;
+  --handle-color: #5c7cba;
+  --season-emoji: '❄️';
+}
+
+body {
+  font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar h1 {
+  font-size: 1.2rem;
+  color: var(--accent);
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.2s;
+}
+
+.toolbar-actions button:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.toolbar-actions button.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 8px rgba(0,0,0,0.15);
+}
+
+.toolbar-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbar-actions button:disabled:hover {
+  background: var(--btn-bg);
+  color: var(--text);
+}
+
+/* Main content */
+.main-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 210px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.sidebar h2 {
+  font-size: 1rem;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+.sidebar h3 {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin: 14px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  margin: 2px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.palette-item:hover {
+  background: var(--btn-bg);
+}
+
+.palette-item:active {
+  transform: scale(0.97);
+}
+
+.palette-item.active-stamp {
+  background: var(--accent);
+  color: #fff;
+}
+
+.palette-item .icon {
+  font-size: 1.1rem;
+}
+
+/* Submenus */
+.palette-submenu {
+  background: var(--submenu-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 2px 0 4px;
+  padding: 4px 0;
+}
+
+.palette-submenu.hidden {
+  display: none;
+}
+
+.submenu-item {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 1px 4px;
+  transition: background 0.15s;
+  color: var(--text);
+}
+
+.submenu-item:hover {
+  background: var(--btn-bg);
+}
+
+.submenu-item.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.palette-section label {
+  display: block;
+  font-size: 0.85rem;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.grid-size-control {
+  margin-top: 8px;
+}
+
+.grid-size-control label {
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+.grid-size-control input {
+  width: 60px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+/* Season selector */
+.season-selector {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.season-selector label {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.season-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.season-btn {
+  flex: 1;
+  padding: 5px 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.season-btn:hover {
+  background: var(--btn-bg);
+  transform: scale(1.1);
+}
+
+.season-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  transform: scale(1.1);
+}
+
+/* Canvas area */
+.canvas-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas-bg);
+}
+
+#floor-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Context menu */
+.context-menu {
+  position: absolute;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  pointer-events: auto;
+}
+
+.context-menu.hidden {
+  display: none;
+}
+
+.context-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.83rem;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.context-menu button:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Statusbar */
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 16px;
+  background: var(--toolbar-bg);
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+/* Saved plans */
+.save-plan-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.2s;
+}
+
+.save-plan-btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.saved-plan-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  margin: 3px 0;
+  border-radius: 5px;
+  background: #fff;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.saved-plan-item:hover {
+  background: var(--btn-bg);
+}
+
+.saved-plan-item .plan-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.saved-plan-item .plan-date {
+  font-size: 0.7rem;
+  color: var(--text-light);
+  margin-left: 4px;
+}
+
+.saved-plan-item .plan-delete {
+  margin-left: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.saved-plan-item .plan-delete:hover {
+  opacity: 1;
+}
+
+/* === Seasonal decorations === */
+.toolbar::before,
+.toolbar::after,
+.statusbar::before,
+.statusbar::after {
+  font-size: 1.2rem;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Spring decorations */
+[data-season="spring"] .toolbar::before { content: '🌸🌷'; margin-right: 8px; }
+[data-season="spring"] .toolbar::after { content: '🌸🌷🌸'; margin-left: 8px; }
+[data-season="spring"] .statusbar::before { content: '🌸'; margin-right: 6px; }
+[data-season="spring"] .statusbar::after { content: '🌸'; margin-left: 6px; }
+[data-season="spring"] .sidebar::after {
+  content: '🌸🌷🌸🌷🌸';
+  display: block;
+  text-align: center;
+  font-size: 1.5rem;
+  margin-top: 16px;
+  opacity: 0.6;
+  letter-spacing: 4px;
+}
+
+/* Summer decorations */
+[data-season="summer"] .toolbar::before { content: '🌊🍉'; margin-right: 8px; }
+[data-season="summer"] .toolbar::after { content: '🌴🍉🌊'; margin-left: 8px; }
+[data-season="summer"] .statusbar::before { content: '🐚'; margin-right: 6px; }
+[data-season="summer"] .statusbar::after { content: '🌻'; margin-left: 6px; }
+[data-season="summer"] .sidebar::after {
+  content: '🍉🌴🌊🐚🌻';
+  display: block;
+  text-align: center;
+  font-size: 1.5rem;
+  margin-top: 16px;
+  opacity: 0.6;
+  letter-spacing: 4px;
+}
+
+/* Autumn decorations */
+[data-season="autumn"] .toolbar::before { content: '🍁🍂'; margin-right: 8px; }
+[data-season="autumn"] .toolbar::after { content: '🍁🌰🍂'; margin-left: 8px; }
+[data-season="autumn"] .statusbar::before { content: '🍁'; margin-right: 6px; }
+[data-season="autumn"] .statusbar::after { content: '🍂'; margin-left: 6px; }
+[data-season="autumn"] .sidebar::after {
+  content: '🍁🍂🌰🍁🍂';
+  display: block;
+  text-align: center;
+  font-size: 1.5rem;
+  margin-top: 16px;
+  opacity: 0.6;
+  letter-spacing: 4px;
+}
+
+/* Winter decorations */
+[data-season="winter"] .toolbar::before { content: '❄️⛄'; margin-right: 8px; }
+[data-season="winter"] .toolbar::after { content: '❄️🎄⛄'; margin-left: 8px; }
+[data-season="winter"] .statusbar::before { content: '❄️'; margin-right: 6px; }
+[data-season="winter"] .statusbar::after { content: '⛄'; margin-left: 6px; }
+[data-season="winter"] .sidebar::after {
+  content: '❄️⛄🎄❄️⛄';
+  display: block;
+  text-align: center;
+  font-size: 1.5rem;
+  margin-top: 16px;
+  opacity: 0.6;
+  letter-spacing: 4px;
+}
+
+/* Floating seasonal decorations in corners */
+.canvas-area::before,
+.canvas-area::after {
+  position: absolute;
+  font-size: 2rem;
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.canvas-area::before {
+  top: 10px;
+  right: 15px;
+}
+
+.canvas-area::after {
+  bottom: 10px;
+  left: 15px;
+}
+
+[data-season="spring"] .canvas-area::before { content: '🌸🌷'; }
+[data-season="spring"] .canvas-area::after { content: '🌸🦋'; }
+
+[data-season="summer"] .canvas-area::before { content: '🍉🌻'; }
+[data-season="summer"] .canvas-area::after { content: '🌴🌊'; }
+
+[data-season="autumn"] .canvas-area::before { content: '🍁🍂'; }
+[data-season="autumn"] .canvas-area::after { content: '🌰🍁'; }
+
+[data-season="winter"] .canvas-area::before { content: '❄️⛄'; }
+[data-season="winter"] .canvas-area::after { content: '🎄❄️'; }
+
+/* === Penguin mascot dialog === */
+.penguin-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+.penguin-overlay.fade-out {
+  animation: fadeOut 0.3s ease;
+  opacity: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.penguin-dialog {
+  background: #fff;
+  border-radius: 20px;
+  padding: 30px 40px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  max-width: 340px;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.penguin-character {
+  font-size: 4rem;
+  margin-bottom: 8px;
+  animation: penguinBounce 1s ease infinite;
+}
+
+@keyframes penguinBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.penguin-bubble {
+  background: var(--btn-bg, #fce4ec);
+  border: 2px solid var(--border, #f0d4d4);
+  border-radius: 16px;
+  padding: 14px 20px;
+  margin: 10px 0 16px;
+  position: relative;
+}
+
+.penguin-bubble::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 10px solid var(--border, #f0d4d4);
+}
+
+.penguin-bubble::after {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--btn-bg, #fce4ec);
+}
+
+.penguin-bubble p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text, #4a3040);
+  line-height: 1.5;
+}
+
+.penguin-close {
+  padding: 8px 24px;
+  border: none;
+  border-radius: 20px;
+  background: var(--accent, #e8729a);
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.penguin-close:hover {
+  background: var(--accent-hover, #d4508a);
+  transform: scale(1.05);
+}
+
+/* === User info panel (top-right of canvas) === */
+.user-info-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  z-index: 50;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  min-width: 200px;
+}
+
+.user-info-field {
+  display: flex;
+  align-items: center;
+  margin: 4px 0;
+  gap: 6px;
+}
+
+.user-info-field label {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  min-width: 28px;
+  text-align: right;
+}
+
+.user-info-field input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.user-info-field input:focus {
+  border-color: var(--accent);
+}
+
+.user-info-field input::placeholder {
+  color: #ccc;
+}
+
+/* Toggle label */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 0;
+  color: var(--text);
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Text tool */
+.text-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.text-tool input[type="text"] {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: #fff;
+}
+
+.text-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.text-tool-row label {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  min-width: 40px;
+}
+
+.text-tool-row select {
+  flex: 1;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: #fff;
+}
+
+/* Rail legend */
+.rail-legend {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  z-index: 50;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  font-size: 0.82rem;
+  color: var(--text);
+  min-width: 120px;
+}
+
+.rail-legend:empty {
+  display: block;
+}
+
+.rail-legend-item {
+  padding: 2px 0;
+  color: #e94560;
+  font-weight: 500;
+}
+
+/* Rail legend editable inputs */
+.rail-legend-textarea {
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  margin: 3px 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  color: #e94560;
+  font-weight: 500;
+  background: #fff;
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.rail-legend-textarea:focus {
+  border-color: #e94560;
+}
+
+/* Context menu color row */
+.ctx-color-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+}
+
+.ctx-color-btn {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+
+.ctx-color-btn:hover {
+  transform: scale(1.2);
+}
+
+/* Context menu label controls row */
+.ctx-label-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+}
+
+.ctx-label-row button {
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--btn-bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.15s;
+}
+
+.ctx-label-row button:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Edit toggle button (bottom-right of canvas area) */
+.edit-item-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 110;
+  padding: 8px 16px;
+  border: 1px solid var(--btn-border);
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.88rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: all 0.2s;
+}
+
+.edit-item-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}

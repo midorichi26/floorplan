@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>かんたん平面図エディタ</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="toolbar">
+      <h1>かんたん平面図エディタ</h1>
+      <div class="toolbar-actions">
+        <button id="btn-undo" title="元に戻す (Ctrl+Z)">← 戻す</button>
+        <button id="btn-redo" title="やり直す (Ctrl+Y)">→ やり直す</button>
+        <button id="btn-draw-room" title="フリーハンドで部屋を描く">✏️ フリーハンド</button>
+        <button id="btn-rect-room" title="四角で部屋を描く">⬜ 四角で描く</button>
+        <button id="btn-draw-line" title="直線を引く">📏 直線</button>
+        <button id="btn-zoom-in" title="図面を拡大">🔍+ 拡大</button>
+        <button id="btn-zoom-out" title="図面を縮小">🔍- 縮小</button>
+        <button id="btn-zoom-reset" title="表示リセット (Ctrl+0)">↺ リセット</button>
+        <button id="btn-pan-left" title="左へ移動">◀</button>
+        <button id="btn-pan-up" title="上へ移動">▲</button>
+        <button id="btn-pan-down" title="下へ移動">▼</button>
+        <button id="btn-pan-right" title="右へ移動">▶</button>
+        <button id="btn-save" title="保存">💾 保存</button>
+        <button id="btn-load" title="読込">📂 読込</button>
+        <button id="btn-export" title="PDF書出（等倍）">📄 PDF書出</button>
+        <button id="btn-export-zoom" title="PDF書出（現在の表示）">📄 PDF(拡大)</button>
+        <button id="btn-bg-image" title="背景画像読込">🖼️ 下絵読込</button>
+        <button id="btn-clear" title="全消去">🗑️ 全消去</button>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <aside class="sidebar">
+        <h2>部品パレット</h2>
+
+        <div class="palette-section">
+          <h3>構造</h3>
+          <div class="palette-item palette-click" data-type="wall">
+            <span class="icon">▬</span> 壁
+          </div>
+          <div class="palette-item palette-dropdown-trigger" id="door-trigger">
+            <span class="icon">🚪</span> ドア ▾
+          </div>
+          <div id="door-submenu" class="palette-submenu hidden">
+            <div class="submenu-item" data-type="door-swing">開き戸（片開き）</div>
+            <div class="submenu-item" data-type="door-swing-r">開き戸（右開き）</div>
+            <div class="submenu-item" data-type="door-double">両開き戸</div>
+            <div class="submenu-item" data-type="door-slide">引き戸（片引き）</div>
+            <div class="submenu-item" data-type="door-slide2">引き戸（引違い）</div>
+            <div class="submenu-item" data-type="door-fold">折れ戸</div>
+            <div class="submenu-item" data-type="door-pocket">引込み戸</div>
+            <div class="submenu-item" data-type="door-accordion">アコーディオン</div>
+            <div class="submenu-item" data-type="door-open">開口（枠のみ）</div>
+          </div>
+          <div class="palette-item palette-click" data-type="window">
+            <span class="icon">🪟</span> 窓
+          </div>
+          <div class="palette-item palette-dropdown-trigger" id="stairs-trigger">
+            <span class="icon">🪜</span> 階段 ▾
+          </div>
+          <div id="stairs-submenu" class="palette-submenu hidden">
+            <div class="submenu-item" data-type="stairs">直階段</div>
+            <div class="submenu-item" data-type="stairs-l">L字階段（折れ階段）</div>
+            <div class="submenu-item" data-type="stairs-u">U字階段（折返し）</div>
+            <div class="submenu-item" data-type="stairs-kaneore">かね折れ階段</div>
+            <div class="submenu-item" data-type="stairs-spiral">らせん階段</div>
+            <div class="submenu-item" data-type="stairs-circular">円形階段</div>
+            <div class="submenu-item" data-type="stairs-curve">曲線階段</div>
+            <div class="submenu-item" data-type="stairs-mawari">回り階段</div>
+          </div>
+          <div class="palette-item palette-click" data-type="step-up">
+            <span class="icon">⏫</span> 段差
+          </div>
+          <div class="palette-item palette-click" data-type="bath-step">
+            <span class="icon">🛁</span> 浴槽段差
+          </div>
+        </div>
+
+        <div class="palette-section">
+          <h3>手すり</h3>
+          <div class="palette-item palette-click" data-type="rail-h">
+            <span class="icon">━</span> 横手すり
+          </div>
+          <div class="palette-item palette-click" data-type="rail-v">
+            <span class="icon">┃</span> 縦手すり
+          </div>
+          <div class="palette-item palette-click" data-type="rail-l">
+            <span class="icon">┗</span> L字手すり
+          </div>
+        </div>
+
+        <div class="palette-section">
+          <h3>家具</h3>
+          <div class="palette-item palette-click" data-type="sofa">
+            <span class="icon">🛋️</span> ソファ
+          </div>
+          <div class="palette-item palette-click" data-type="bed">
+            <span class="icon">🛏️</span> ベッド
+          </div>
+          <div class="palette-item palette-click" data-type="table">
+            <span class="icon">🪑</span> テーブル
+          </div>
+          <div class="palette-item palette-click" data-type="chair">
+            <span class="icon">💺</span> イス
+          </div>
+          <div class="palette-item palette-click" data-type="desk">
+            <span class="icon">🖥️</span> デスク
+          </div>
+        </div>
+
+        <div class="palette-section">
+          <h3>水回り</h3>
+          <div class="palette-item palette-click" data-type="toilet">
+            <span class="icon">🚽</span> 洋式トイレ
+          </div>
+          <div class="palette-item palette-click" data-type="toilet-jp">
+            <span class="icon">🚽</span> 和式トイレ
+          </div>
+          <div class="palette-item palette-click" data-type="toilet-kisha">
+            <span class="icon">🚽</span> 汽車便器
+          </div>
+          <div class="palette-item palette-click" data-type="bath">
+            <span class="icon">🛁</span> 浴槽
+          </div>
+          <div class="palette-item palette-click" data-type="sink">
+            <span class="icon">🚰</span> 洗面台
+          </div>
+          <div class="palette-item palette-click" data-type="kitchen">
+            <span class="icon">🍳</span> キッチン
+          </div>
+        </div>
+
+        <div class="palette-section">
+          <h3>操作</h3>
+          <label><input type="checkbox" id="chk-grid" checked> グリッド表示</label>
+          <label><input type="checkbox" id="chk-snap" checked> グリッドスナップ</label>
+          <div class="grid-size-control">
+            <label for="grid-size">グリッドサイズ:</label>
+            <input type="number" id="grid-size" value="20" min="10" max="100" step="5">
+          </div>
+          <div class="grid-size-control" id="bg-controls" style="display:none;">
+            <label for="bg-opacity">下絵の濃さ:</label>
+            <input type="range" id="bg-opacity" value="30" min="5" max="80" step="5" style="width:80px;">
+            <div style="display:flex;gap:4px;margin-top:4px;">
+              <button id="btn-bg-toggle" style="font-size:0.75rem;cursor:pointer;flex:1;">表示/非表示</button>
+              <button id="btn-bg-rotate" style="font-size:0.75rem;cursor:pointer;flex:1;">↻ 回転</button>
+            </div>
+            <button id="btn-bg-remove" style="margin-top:4px;font-size:0.75rem;cursor:pointer;width:100%;">下絵を削除</button>
+          </div>
+        </div>
+
+        <div class="palette-section">
+          <h3>テキスト</h3>
+          <div class="text-tool">
+            <input type="text" id="text-input" placeholder="文字を入力">
+            <div class="text-tool-row">
+              <label for="text-size">サイズ:</label>
+              <input type="number" id="text-size" value="13" min="6" max="48" step="1" style="width:50px;">
+              <span style="font-size:0.75rem;color:var(--text-light);">px</span>
+            </div>
+            <div class="text-tool-row">
+              <label for="text-color">色:</label>
+              <input type="color" id="text-color" value="#333333">
+              <select id="text-color-preset">
+                <option value="#333333">黒</option>
+                <option value="#e94560">赤</option>
+                <option value="#2196F3">青</option>
+                <option value="#4CAF50">緑</option>
+                <option value="#FF9800">オレンジ</option>
+                <option value="#9C27B0">紫</option>
+              </select>
+            </div>
+            <button id="btn-place-text" class="save-plan-btn">📝 図面に配置</button>
+          </div>
+        </div>
+
+        <div class="palette-section">
+          <h3>設定</h3>
+          <label class="toggle-label">
+            <input type="checkbox" id="chk-penguin" checked>
+            🐧 ペンギンメッセージ
+          </label>
+        </div>
+
+        <div class="palette-section">
+          <h3>保存済み図面</h3>
+          <div id="saved-plans-list"></div>
+          <button id="btn-save-plan" class="save-plan-btn">📌 現在の図面を保存</button>
+        </div>
+      </aside>
+
+      <main class="canvas-area">
+        <canvas id="floor-canvas"></canvas>
+        <div id="user-info-panel" class="user-info-panel">
+          <div class="user-info-field">
+            <label>名前</label>
+            <input type="text" id="user-name" placeholder="利用者名">
+          </div>
+          <div class="user-info-field">
+            <label>〒</label>
+            <input type="text" id="user-zip" placeholder="000-0000" maxlength="8">
+          </div>
+          <div class="user-info-field">
+            <label>住所</label>
+            <input type="text" id="user-address" placeholder="住所を入力">
+          </div>
+        </div>
+        <div id="rail-legend" class="rail-legend"></div>
+        <div id="context-menu" class="context-menu hidden">
+          <button id="ctx-rotate">↻ 回転</button>
+          <button id="ctx-resize-up">⬆ 大きく</button>
+          <button id="ctx-resize-down">⬇ 小さく</button>
+          <button id="ctx-hatch">⧄ 斜線ON/OFF</button>
+          <div class="ctx-color-row">
+            <span style="font-size:0.8rem;padding:4px 8px;">色:</span>
+            <button class="ctx-color-btn" data-color="#333333" style="background:#333333;" title="黒"></button>
+            <button class="ctx-color-btn" data-color="#e94560" style="background:#e94560;" title="赤"></button>
+            <button class="ctx-color-btn" data-color="#2196F3" style="background:#2196F3;" title="青"></button>
+            <button class="ctx-color-btn" data-color="#4CAF50" style="background:#4CAF50;" title="緑"></button>
+            <button class="ctx-color-btn" data-color="#FF9800" style="background:#FF9800;" title="オレンジ"></button>
+            <button class="ctx-color-btn" data-color="#9C27B0" style="background:#9C27B0;" title="紫"></button>
+          </div>
+          <div class="ctx-label-row" id="ctx-label-controls">
+            <span style="font-size:0.8rem;padding:4px 8px;">文字:</span>
+            <button id="ctx-label-size-down" title="文字を小さく">A-</button>
+            <span id="ctx-label-size-display" style="font-size:0.75rem;min-width:24px;text-align:center;">13</span>
+            <button id="ctx-label-size-up" title="文字を大きく">A+</button>
+            <button id="ctx-label-vertical" title="縦書き/横書き切替">縦横</button>
+          </div>
+          <button id="ctx-rename">✎ 名前変更</button>
+          <button id="ctx-bring-front">⬆ 最前面</button>
+          <button id="ctx-send-back">⬇ 最背面</button>
+          <button id="ctx-duplicate">📋 複製</button>
+          <button id="ctx-delete">❌ 削除</button>
+        </div>
+        <button id="btn-edit-item" class="edit-item-btn" style="display:none;">✏️ 編集</button>
+      </main>
+    </div>
+
+    <footer class="statusbar">
+      <span id="status-pos">X: 0, Y: 0</span>
+      <span id="status-info">部品をドラッグ＆ドロップで配置してください</span>
+    </footer>
+  </div>
+
+  <input type="file" id="file-input" accept=".json" style="display:none">
+  <input type="file" id="bg-image-input" accept="image/*,.pdf" style="display:none">
+  <script src="app.js"></script>
+</body>
+</html>
