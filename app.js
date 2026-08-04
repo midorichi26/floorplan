@@ -70,6 +70,9 @@
   let lineEnd = null;
   let isLineDragging = false;
 
+  // Edge toggle mode (hide/show room edges)
+  let edgeToggleMode = false;
+
   // Undo/Redo history
   let undoStack = [];
   let redoStack = [];
@@ -179,6 +182,107 @@
     draw();
   }
   window.addEventListener('resize', resizeCanvas);
+
+  // === Custom Scrollbars ===
+  const scrollbarV = document.getElementById('scrollbar-v');
+  const scrollbarVThumb = document.getElementById('scrollbar-v-thumb');
+  const scrollbarH = document.getElementById('scrollbar-h');
+  const scrollbarHThumb = document.getElementById('scrollbar-h-thumb');
+
+  // Virtual world bounds (defines how far you can scroll)
+  const WORLD_SIZE = 5000; // total world span in each direction
+
+  function updateScrollbars() {
+    const canvasW = canvas.width;
+    const canvasH = canvas.height;
+    // Visible area in world coordinates
+    const visibleW = canvasW / viewScale;
+    const visibleH = canvasH / viewScale;
+    const worldW = WORLD_SIZE;
+    const worldH = WORLD_SIZE;
+
+    // Horizontal scrollbar
+    const trackW = scrollbarH.clientWidth;
+    const thumbW = Math.max(30, (visibleW / worldW) * trackW);
+    // viewOffsetX=0 means world origin at left edge, negative means scrolled right
+    const scrollFractionX = (-viewOffsetX / viewScale + WORLD_SIZE / 2) / worldW;
+    const thumbX = Math.max(0, Math.min(trackW - thumbW, scrollFractionX * trackW - thumbW / 2));
+    scrollbarHThumb.style.width = thumbW + 'px';
+    scrollbarHThumb.style.left = thumbX + 'px';
+
+    // Vertical scrollbar
+    const trackH = scrollbarV.clientHeight;
+    const thumbH = Math.max(30, (visibleH / worldH) * trackH);
+    const scrollFractionY = (-viewOffsetY / viewScale + WORLD_SIZE / 2) / worldH;
+    const thumbY = Math.max(0, Math.min(trackH - thumbH, scrollFractionY * trackH - thumbH / 2));
+    scrollbarVThumb.style.height = thumbH + 'px';
+    scrollbarVThumb.style.top = thumbY + 'px';
+  }
+
+  // Drag vertical scrollbar
+  (function() {
+    let dragging = false;
+    let startY = 0;
+    let startOffset = 0;
+
+    scrollbarVThumb.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      startY = e.clientY;
+      startOffset = viewOffsetY;
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const trackH = scrollbarV.clientHeight;
+      const dy = e.clientY - startY;
+      // Convert pixel movement on track to world movement
+      const worldMove = (dy / trackH) * WORLD_SIZE * viewScale;
+      viewOffsetY = startOffset - worldMove;
+      draw();
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (dragging) {
+        dragging = false;
+        document.body.style.userSelect = '';
+      }
+    });
+  })();
+
+  // Drag horizontal scrollbar
+  (function() {
+    let dragging = false;
+    let startX = 0;
+    let startOffset = 0;
+
+    scrollbarHThumb.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = true;
+      startX = e.clientX;
+      startOffset = viewOffsetX;
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const trackW = scrollbarH.clientWidth;
+      const dx = e.clientX - startX;
+      const worldMove = (dx / trackW) * WORLD_SIZE * viewScale;
+      viewOffsetX = startOffset - worldMove;
+      draw();
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (dragging) {
+        dragging = false;
+        document.body.style.userSelect = '';
+      }
+    });
+  })();
 
   // === Snap helper ===
   function snap(value) {
@@ -325,6 +429,7 @@
     // Auto-show/hide context menu based on selection
     updateContextMenuPosition();
     updateEditBtnVisibility();
+    updateScrollbars();
     // Sync text size/color selector when a text item is selected
     if (selectedItem && selectedItem.type === 'text') {
       document.getElementById('text-size').value = selectedItem.fontSize || 13;
@@ -364,16 +469,36 @@
     ctx.fillStyle = room.color;
     ctx.fill();
 
-    // Draw walls segment by segment, clipping out door areas
+    // Draw walls segment by segment (supports per-edge visibility)
     const roomColor = room.lineColor || '#333';
     ctx.strokeStyle = room === selectedRoom ? '#4a9eff' : roomColor;
     ctx.lineWidth = room === selectedRoom ? 4 : 3;
 
     const pts = room.points;
+    const hiddenEdges = room.hiddenEdges || [];
     for (let i = 0; i < pts.length; i++) {
+      if (hiddenEdges.indexOf(i) !== -1) {
+        // Edge is hidden - show dashed hint only when room is selected
+        if (room === selectedRoom) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(233, 69, 96, 0.3)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[(i + 1) % pts.length].x, pts[(i + 1) % pts.length].y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+        continue;
+      }
       const a = pts[i];
       const b = pts[(i + 1) % pts.length];
-      drawWallSegmentWithDoors(a, b, ctx.strokeStyle, ctx.lineWidth);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
     }
 
     // Room label
@@ -655,6 +780,7 @@
     ctx.save();
     ctx.translate(item.x + item.w / 2, item.y + item.h / 2);
     ctx.rotate((item.rotation || 0) * Math.PI / 180);
+    ctx.scale(item.flipH ? -1 : 1, item.flipV ? -1 : 1);
     ctx.translate(-(item.w / 2), -(item.h / 2));
 
     // Draw bounding box only for items without custom rendering
@@ -1125,6 +1251,22 @@
       if (Math.abs(item.w - measured) > 5) item.w = measured + 4;
     }
 
+    // Line rendering (直線)
+    if (item.type === 'line') {
+      ctx.strokeStyle = item === selectedItem ? '#e94560' : (item.itemColor || item.color || '#333');
+      const baseWidth = item.lineWidth || 3;
+      ctx.lineWidth = item === selectedItem ? baseWidth + 1 : baseWidth;
+      // Draw line from stored absolute coords relative to bounding box
+      const lx1 = item.x1 - item.x;
+      const ly1 = item.y1 - item.y;
+      const lx2 = item.x2 - item.x;
+      const ly2 = item.y2 - item.y;
+      ctx.beginPath();
+      ctx.moveTo(lx1, ly1);
+      ctx.lineTo(lx2, ly2);
+      ctx.stroke();
+    }
+
     // Step/level difference rendering (段差記号 - クランク型: ┘└ のような段違い線)
     if (item.type === 'step-up') {
       ctx.strokeStyle = lineColor;
@@ -1218,12 +1360,19 @@
     }
 
     // Door rendering - CAD standard symbols (JIS style)
-    // No wall lines drawn by doors - wall clipping handles the gap
+    // White background under door area to ensure visibility over wall lines
 
     if (item.type === 'door-swing') {
+      // White background under the arc area
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, item.h);
+      ctx.arc(0, item.h, item.w + 1, -Math.PI / 2, 0);
+      ctx.closePath();
+      ctx.fill();
+      // Door panel line (from hinge point)
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1.5;
-      // Door panel line (from hinge point)
       ctx.beginPath();
       ctx.moveTo(0, item.h);
       ctx.lineTo(0, item.h - item.w);
@@ -1235,9 +1384,16 @@
     }
 
     if (item.type === 'door-swing-r') {
+      // White background under the arc area
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(item.w, item.h);
+      ctx.arc(item.w, item.h, item.w + 1, -Math.PI, -Math.PI / 2);
+      ctx.closePath();
+      ctx.fill();
+      // Door panel line
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1.5;
-      // Door panel line
       ctx.beginPath();
       ctx.moveTo(item.w, item.h);
       ctx.lineTo(item.w, item.h - item.w);
@@ -1250,8 +1406,15 @@
 
     if (item.type === 'door-slide') {
       // 片引き戸: 実線パネル＋破線で戸袋位置
-      ctx.strokeStyle = lineColor;
+      // White background to cover wall lines underneath
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(0, item.h * 0.5);
+      ctx.lineTo(item.w, item.h * 0.5);
+      ctx.stroke();
       // Door panel (solid thick line, right side = open position)
+      ctx.strokeStyle = lineColor;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(item.w * 0.5, item.h * 0.5);
@@ -1269,6 +1432,18 @@
 
     if (item.type === 'door-slide2') {
       // 引違い戸: 破線2本で間口全幅を表現
+      // White background to cover wall lines underneath
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(0, item.h * 0.3);
+      ctx.lineTo(item.w, item.h * 0.3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, item.h * 0.7);
+      ctx.lineTo(item.w, item.h * 0.7);
+      ctx.stroke();
+      // Dashed lines
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
@@ -1285,9 +1460,22 @@
 
     if (item.type === 'door-double') {
       // 両開き戸: 左右の扉板線＋各1/4円弧
+      const halfW = item.w / 2;
+      // White background under both arcs
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, item.h);
+      ctx.arc(0, item.h, halfW + 1, -Math.PI / 2, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(item.w, item.h);
+      ctx.arc(item.w, item.h, halfW + 1, -Math.PI, -Math.PI / 2);
+      ctx.closePath();
+      ctx.fill();
+      // Draw door lines
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1.5;
-      const halfW = item.w / 2;
       // Left panel + arc
       ctx.beginPath();
       ctx.moveTo(0, item.h);
@@ -1308,6 +1496,9 @@
 
     if (item.type === 'door-fold') {
       // 折れ戸: V字に折れたパネル
+      // White background
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, item.w, item.h);
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -1324,6 +1515,14 @@
 
     if (item.type === 'door-pocket') {
       // 引込み戸: 破線パネル（壁内に格納）
+      // White background to cover wall lines underneath
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(0, item.h * 0.5);
+      ctx.lineTo(item.w * 0.5, item.h * 0.5);
+      ctx.stroke();
+      // Dashed line
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 3;
       ctx.setLineDash([4, 3]);
@@ -1336,6 +1535,9 @@
 
     if (item.type === 'door-accordion') {
       // アコーディオン: ジグザグの連続線
+      // White background
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, item.w, item.h);
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 2;
       const folds = 6;
@@ -1352,7 +1554,9 @@
     }
 
     if (item.type === 'door-open') {
-      // 開口: 壁が切れているだけ（何も描かない、壁クリッピングのみ）
+      // 開口: 壁線を白で消して開口を表現
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, -2, item.w, item.h + 4);
     }
 
     // Label (not for custom-rendered items) - supports offset for repositioning
@@ -1367,8 +1571,18 @@
       ctx.fillText(item.label, lblX, lblY);
     }
 
-    // Selection: only show rotation handle (no red squares to keep view clean)
+    // Selection highlight: prominent dashed border + semi-transparent overlay
     if (item === selectedItem) {
+      // Semi-transparent highlight background
+      ctx.fillStyle = 'rgba(74, 158, 255, 0.08)';
+      ctx.fillRect(-4, -4, item.w + 8, item.h + 8);
+      // Dashed selection border
+      ctx.strokeStyle = '#e94560';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(-4, -4, item.w + 8, item.h + 8);
+      ctx.setLineDash([]);
+
       // Rotation handle (circle above the item)
       const rotY = -18;
       ctx.beginPath();
@@ -1385,6 +1599,36 @@
       ctx.strokeStyle = '#4a9eff';
       ctx.lineWidth = 1;
       ctx.stroke();
+
+      // Show item label/type near the selection for clarity
+      const infoText = item.label || (ITEM_DEFS[item.type] ? ITEM_DEFS[item.type].label : item.type) || '';
+      if (infoText) {
+        ctx.fillStyle = '#e94560';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(infoText, item.w / 2, -24);
+      }
+
+      // Resize handles (small squares at corners and edge midpoints)
+      const hs = 5; // handle half-size
+      const handlePositions = [
+        { x: 0, y: 0 },              // top-left
+        { x: item.w, y: 0 },         // top-right
+        { x: 0, y: item.h },         // bottom-left
+        { x: item.w, y: item.h },    // bottom-right
+        { x: item.w / 2, y: 0 },     // top-center
+        { x: item.w / 2, y: item.h },// bottom-center
+        { x: 0, y: item.h / 2 },     // left-center
+        { x: item.w, y: item.h / 2 },// right-center
+      ];
+      for (const hp of handlePositions) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(hp.x - hs, hp.y - hs, hs * 2, hs * 2);
+        ctx.strokeStyle = '#e94560';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(hp.x - hs, hp.y - hs, hs * 2, hs * 2);
+      }
     }
     ctx.restore();
   }
@@ -1399,25 +1643,27 @@
     const lx = dx * Math.cos(angle) - dy * Math.sin(angle) + item.w / 2;
     const ly = dx * Math.sin(angle) + dy * Math.cos(angle) + item.h / 2;
 
-    const hs = 7;
+    const hs = 10; // handle hit size (larger for easier grabbing)
 
     // Rotation handle (blue circle above item)
-    if (Math.abs(lx - item.w / 2) < 10 && ly > -26 && ly < -8) return 'rotate';
-
-    // Only detect resize handles if click is near the border
-    const inCenter = lx > hs && lx < item.w - hs && ly > hs && ly < item.h - hs;
-    if (inCenter) return null;
+    if (Math.abs(lx - item.w / 2) < 12 && ly > -28 && ly < -6) return 'rotate';
 
     // Corner handles first (they take priority)
     if (Math.abs(lx - item.w) < hs && Math.abs(ly - item.h) < hs) return 'br';
     if (Math.abs(lx) < hs && Math.abs(ly) < hs) return 'tl';
     if (Math.abs(lx - item.w) < hs && Math.abs(ly) < hs) return 'tr';
     if (Math.abs(lx) < hs && Math.abs(ly - item.h) < hs) return 'bl';
-    // Edge handles
-    if (Math.abs(lx - item.w) < hs && Math.abs(ly - item.h/2) < hs) return 'r';
-    if (Math.abs(lx) < hs && Math.abs(ly - item.h/2) < hs) return 'l';
-    if (Math.abs(lx - item.w/2) < hs && Math.abs(ly - item.h) < hs) return 'b';
-    if (Math.abs(lx - item.w/2) < hs && Math.abs(ly) < hs) return 't';
+
+    // Edge handles: for thin items, allow grabbing along the entire edge
+    // Right edge: near right side
+    if (Math.abs(lx - item.w) < hs && ly >= -hs && ly <= item.h + hs) return 'r';
+    // Left edge: near left side
+    if (Math.abs(lx) < hs && ly >= -hs && ly <= item.h + hs) return 'l';
+    // Bottom edge: near bottom
+    if (Math.abs(ly - item.h) < hs && lx >= -hs && lx <= item.w + hs) return 'b';
+    // Top edge: near top
+    if (Math.abs(ly) < hs && lx >= -hs && lx <= item.w + hs) return 't';
+
     return null;
   }
 
@@ -1555,6 +1801,41 @@
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
     const { x: mx, y: my } = screenToWorld(screenX, screenY);
+
+    // Edge toggle mode: click near an edge of the selected room to toggle visibility
+    if (edgeToggleMode && selectedRoom) {
+      const pts = selectedRoom.points;
+      const tolerance = 10 / viewScale; // 10 screen pixels
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i];
+        const b = pts[(i + 1) % pts.length];
+        // Distance from point to line segment
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const lenSq = dx * dx + dy * dy;
+        let dist;
+        if (lenSq === 0) {
+          dist = Math.hypot(mx - a.x, my - a.y);
+        } else {
+          const t = Math.max(0, Math.min(1, ((mx - a.x) * dx + (my - a.y) * dy) / lenSq));
+          dist = Math.hypot(mx - (a.x + t * dx), my - (a.y + t * dy));
+        }
+        if (dist < tolerance) {
+          saveState();
+          if (!selectedRoom.hiddenEdges) selectedRoom.hiddenEdges = [];
+          const idx = selectedRoom.hiddenEdges.indexOf(i);
+          if (idx === -1) {
+            selectedRoom.hiddenEdges.push(i);
+            updateStatus(`辺${i + 1}を非表示にしました（再度クリックで表示）`);
+          } else {
+            selectedRoom.hiddenEdges.splice(idx, 1);
+            updateStatus(`辺${i + 1}を再表示しました`);
+          }
+          draw();
+          return;
+        }
+      }
+      return;
+    }
 
     // Line mode (drag to draw a straight line)
     if (lineMode) {
@@ -1701,6 +1982,14 @@
       dragOffset.y = my - item.y;
       items = items.filter(i => i !== item);
       items.push(item);
+      // Show selected item info in status bar
+      const label = item.label || (ITEM_DEFS[item.type] ? ITEM_DEFS[item.type].label : item.type) || '';
+      const overlapping = items.filter(it => {
+        return !(it.x > item.x + item.w + gridSize || it.x + it.w < item.x - gridSize ||
+                 it.y > item.y + item.h + gridSize || it.y + it.h < item.y - gridSize);
+      });
+      const overlapHint = overlapping.length > 1 ? `（重なり${overlapping.length}個 / Tabで切替）` : '';
+      updateStatus(`選択中: ${label} ${overlapHint}【Escで選択解除】`);
     } else {
       const room = getRoomAt(mx, my);
       if (room) {
@@ -1727,6 +2016,10 @@
       } else {
         selectedItem = null;
         selectedRoom = null;
+        contextMenuVisible = false;
+        hideContextMenu();
+        updateEditBtnVisibility();
+        updateStatus('部品をドラッグ＆ドロップで配置してください');
       }
     }
     draw();
@@ -1793,32 +2086,33 @@
       return;
     }
 
-    // Resizing an item
+    // Resizing an item (free pixel-level resizing, no grid snap)
     if (resizingItem) {
       const s = itemResizeStart;
-      const dx = snap(mx) - snap(s.mx);
-      const dy = snap(my) - snap(s.my);
+      const dx = mx - s.mx;
+      const dy = my - s.my;
+      const minSize = 4; // minimum size in pixels
 
       switch (itemResizeHandle) {
         case 'r':
-          resizingItem.w = Math.max(gridSize, s.w + dx); break;
+          resizingItem.w = Math.max(minSize, s.w + dx); break;
         case 'l':
-          resizingItem.x = s.x + dx; resizingItem.w = Math.max(gridSize, s.w - dx); break;
+          resizingItem.x = s.x + dx; resizingItem.w = Math.max(minSize, s.w - dx); break;
         case 'b':
-          resizingItem.h = Math.max(gridSize, s.h + dy); break;
+          resizingItem.h = Math.max(minSize, s.h + dy); break;
         case 't':
-          resizingItem.y = s.y + dy; resizingItem.h = Math.max(gridSize, s.h - dy); break;
+          resizingItem.y = s.y + dy; resizingItem.h = Math.max(minSize, s.h - dy); break;
         case 'br':
-          resizingItem.w = Math.max(gridSize, s.w + dx); resizingItem.h = Math.max(gridSize, s.h + dy); break;
+          resizingItem.w = Math.max(minSize, s.w + dx); resizingItem.h = Math.max(minSize, s.h + dy); break;
         case 'tl':
-          resizingItem.x = s.x + dx; resizingItem.w = Math.max(gridSize, s.w - dx);
-          resizingItem.y = s.y + dy; resizingItem.h = Math.max(gridSize, s.h - dy); break;
+          resizingItem.x = s.x + dx; resizingItem.w = Math.max(minSize, s.w - dx);
+          resizingItem.y = s.y + dy; resizingItem.h = Math.max(minSize, s.h - dy); break;
         case 'tr':
-          resizingItem.w = Math.max(gridSize, s.w + dx);
-          resizingItem.y = s.y + dy; resizingItem.h = Math.max(gridSize, s.h - dy); break;
+          resizingItem.w = Math.max(minSize, s.w + dx);
+          resizingItem.y = s.y + dy; resizingItem.h = Math.max(minSize, s.h - dy); break;
         case 'bl':
-          resizingItem.x = s.x + dx; resizingItem.w = Math.max(gridSize, s.w - dx);
-          resizingItem.h = Math.max(gridSize, s.h + dy); break;
+          resizingItem.x = s.x + dx; resizingItem.w = Math.max(minSize, s.w - dx);
+          resizingItem.h = Math.max(minSize, s.h + dy); break;
       }
       draw();
       return;
@@ -1902,7 +2196,7 @@
     if (selectedItem && !drawMode && !rectMode) {
       const iHandle = getItemHandleAt(selectedItem, mx, my);
       if (iHandle) {
-        const cursorMap = { l: 'w-resize', r: 'e-resize', t: 'n-resize', b: 's-resize', tl: 'nw-resize', tr: 'ne-resize', bl: 'sw-resize', br: 'se-resize' };
+        const cursorMap = { l: 'w-resize', r: 'e-resize', t: 'n-resize', b: 's-resize', tl: 'nw-resize', tr: 'ne-resize', bl: 'sw-resize', br: 'se-resize', rotate: 'crosshair' };
         canvas.style.cursor = cursorMap[iHandle] || 'default';
       } else {
         canvas.style.cursor = 'default';
@@ -1947,6 +2241,7 @@
       if (len > gridSize / 2) {
         saveState();
         // Store line as an item with type 'line'
+        const currentLineWidth = parseInt(document.getElementById('line-width').value) || 3;
         const newItem = {
           type: 'line',
           x: Math.min(lineStart.x, lineEnd.x),
@@ -1956,6 +2251,7 @@
           x1: lineStart.x, y1: lineStart.y,
           x2: lineEnd.x, y2: lineEnd.y,
           color: '#333',
+          lineWidth: currentLineWidth,
           label: '',
           rotation: 0,
         };
@@ -2079,10 +2375,8 @@
       resizeHandle = null;
       canvas.style.cursor = 'default';
     }
-    // Snap item to grid on release (smooth drag, precise placement)
-    if (draggingItem && snapToGrid) {
-      draggingItem.x = snap(draggingItem.x);
-      draggingItem.y = snap(draggingItem.y);
+    // No snap on release - place item exactly where the user drops it
+    if (draggingItem) {
       draw();
     }
     draggingLabel = null;
@@ -2183,6 +2477,34 @@
     canvas.style.cursor = 'default';
     document.getElementById('btn-rect-room').classList.remove('active');
     draw(); updateStatus('四角モードを終了しました');
+  }
+
+  // === Line drawing mode ===
+  function startLineMode() {
+    if (drawMode) cancelDrawMode();
+    if (rectMode) cancelRectMode();
+    if (stampMode) cancelStampMode();
+    lineMode = true;
+    isLineDragging = false;
+    lineStart = null;
+    lineEnd = null;
+    selectedItem = null;
+    selectedRoom = null;
+    canvas.style.cursor = 'crosshair';
+    document.getElementById('btn-draw-line').classList.add('active');
+    updateStatus('直線モード：ドラッグで直線を描画 / Escで終了');
+    draw();
+  }
+
+  function cancelLineMode() {
+    lineMode = false;
+    isLineDragging = false;
+    lineStart = null;
+    lineEnd = null;
+    canvas.style.cursor = 'default';
+    document.getElementById('btn-draw-line').classList.remove('active');
+    draw();
+    updateStatus('直線モードを終了しました');
   }
 
   // === Stamp mode (click to place) ===
@@ -2305,16 +2627,88 @@
     } else {
       labelControls.style.display = 'none';
     }
+    // Update line width controls visibility
+    const lineWidthControls = document.getElementById('ctx-line-width-controls');
+    if (selectedItem && selectedItem.type === 'line') {
+      lineWidthControls.style.display = 'flex';
+      document.getElementById('ctx-line-width-display').textContent = selectedItem.lineWidth || 3;
+    } else {
+      lineWidthControls.style.display = 'none';
+    }
   }
-  function hideContextMenu() { contextMenu.classList.add('hidden'); }
+  function hideContextMenu() { contextMenu.classList.add('hidden'); contextMenuUserMoved = false; }
+
+  // === Context menu drag functionality ===
+  (function() {
+    const dragHandle = document.getElementById('ctx-drag-handle');
+    let isDraggingMenu = false;
+    let menuDragStart = { x: 0, y: 0 };
+    let menuStartPos = { x: 0, y: 0 };
+
+    dragHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isDraggingMenu = true;
+      menuDragStart = { x: e.clientX, y: e.clientY };
+      menuStartPos = {
+        x: parseInt(contextMenu.style.left) || 0,
+        y: parseInt(contextMenu.style.top) || 0
+      };
+      dragHandle.style.cursor = 'grabbing';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDraggingMenu) return;
+      const dx = e.clientX - menuDragStart.x;
+      const dy = e.clientY - menuDragStart.y;
+      contextMenu.style.left = (menuStartPos.x + dx) + 'px';
+      contextMenu.style.top = (menuStartPos.y + dy) + 'px';
+      contextMenuUserMoved = true; // User has manually positioned the menu
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDraggingMenu) {
+        isDraggingMenu = false;
+        dragHandle.style.cursor = 'grab';
+      }
+    });
+  })();
 
   // Context menu is now hidden by default; shown only on demand
   let contextMenuVisible = false;
+  let contextMenuUserMoved = false; // Track if user manually moved the menu
 
   function updateContextMenuPosition() {
     // Only show if explicitly toggled on AND something is selected
     if (!contextMenuVisible) {
       hideContextMenu();
+      contextMenuUserMoved = false;
+      return;
+    }
+    // If user has manually moved the menu, keep it in place (just ensure it's visible)
+    if (contextMenuUserMoved) {
+      if (selectedItem || selectedRoom) {
+        contextMenu.classList.remove('hidden');
+        // Update line width and label controls visibility
+        const labelControls = document.getElementById('ctx-label-controls');
+        const lineWidthControls = document.getElementById('ctx-line-width-controls');
+        if (selectedRoom) {
+          labelControls.style.display = 'flex';
+          document.getElementById('ctx-label-size-display').textContent = selectedRoom.labelFontSize || 13;
+        } else {
+          labelControls.style.display = 'none';
+        }
+        if (selectedItem && selectedItem.type === 'line') {
+          lineWidthControls.style.display = 'flex';
+          document.getElementById('ctx-line-width-display').textContent = selectedItem.lineWidth || 3;
+        } else {
+          lineWidthControls.style.display = 'none';
+        }
+      } else {
+        hideContextMenu();
+        contextMenuVisible = false;
+        contextMenuUserMoved = false;
+      }
       return;
     }
     const menuW = 130;
@@ -2399,6 +2793,12 @@
   document.getElementById('ctx-rotate').addEventListener('click', () => {
     if (selectedItem) { saveState(); selectedItem.rotation = ((selectedItem.rotation||0) + 90) % 360; draw(); updateContextMenuPosition(); }
   });
+  document.getElementById('ctx-flip-h').addEventListener('click', () => {
+    if (selectedItem) { saveState(); selectedItem.flipH = !selectedItem.flipH; draw(); }
+  });
+  document.getElementById('ctx-flip-v').addEventListener('click', () => {
+    if (selectedItem) { saveState(); selectedItem.flipV = !selectedItem.flipV; draw(); }
+  });
   document.getElementById('ctx-resize-up').addEventListener('click', () => {
     if (selectedItem && selectedItem.type === 'text') {
       saveState();
@@ -2443,6 +2843,21 @@
     }
   });
 
+  // Toggle edge visibility mode
+  document.getElementById('ctx-toggle-edge').addEventListener('click', () => {
+    if (selectedRoom) {
+      edgeToggleMode = !edgeToggleMode;
+      if (edgeToggleMode) {
+        updateStatus('辺選択モード：部屋の辺をクリックで表示/非表示を切替。Escまたは再度ボタンで終了');
+        canvas.style.cursor = 'crosshair';
+      } else {
+        updateStatus('辺選択モードを終了しました');
+        canvas.style.cursor = 'default';
+      }
+      draw();
+    }
+  });
+
   // Color selection for items and rooms
   document.querySelectorAll('.ctx-color-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2457,6 +2872,24 @@
         draw();
       }
     });
+  });
+
+  // Line width controls for line items
+  document.getElementById('ctx-line-thin').addEventListener('click', () => {
+    if (selectedItem && selectedItem.type === 'line') {
+      saveState();
+      selectedItem.lineWidth = Math.max(1, (selectedItem.lineWidth || 3) - 1);
+      document.getElementById('ctx-line-width-display').textContent = selectedItem.lineWidth;
+      draw();
+    }
+  });
+  document.getElementById('ctx-line-thick').addEventListener('click', () => {
+    if (selectedItem && selectedItem.type === 'line') {
+      saveState();
+      selectedItem.lineWidth = Math.min(20, (selectedItem.lineWidth || 3) + 1);
+      document.getElementById('ctx-line-width-display').textContent = selectedItem.lineWidth;
+      draw();
+    }
   });
 
   // === Room label size & vertical toggle ===
@@ -2588,10 +3021,53 @@
     }
 
     if (e.key === 'Escape') {
+      if (edgeToggleMode) { edgeToggleMode = false; canvas.style.cursor = 'default'; updateStatus('辺選択モードを終了しました'); draw(); return; }
       if (stampMode) { cancelStampMode(); return; }
       if (drawMode) { cancelDrawMode(); return; }
       if (rectMode) { cancelRectMode(); return; }
+      if (lineMode) { cancelLineMode(); return; }
+      // Deselect any selected item or room
+      if (selectedItem || selectedRoom) {
+        selectedItem = null;
+        selectedRoom = null;
+        contextMenuVisible = false;
+        hideContextMenu();
+        updateEditBtnVisibility();
+        draw();
+        updateStatus('選択を解除しました');
+        return;
+      }
     }
+
+    // Tab key: cycle through overlapping items at the same position
+    if (e.key === 'Tab' && !e.target.matches('input, textarea')) {
+      e.preventDefault();
+      if (selectedItem) {
+        // Find all items that overlap with the selected item's bounding box
+        const sel = selectedItem;
+        const cx = sel.x + sel.w / 2;
+        const cy = sel.y + sel.h / 2;
+        const overlapping = items.filter(it => {
+          const ix = it.x, iy = it.y, iw = it.w, ih = it.h;
+          // Check if centers are close or bounding boxes overlap
+          return !(ix > sel.x + sel.w + gridSize || ix + iw < sel.x - gridSize ||
+                   iy > sel.y + sel.h + gridSize || iy + ih < sel.y - gridSize);
+        });
+        if (overlapping.length > 1) {
+          const currentIdx = overlapping.indexOf(selectedItem);
+          const nextIdx = e.shiftKey
+            ? (currentIdx - 1 + overlapping.length) % overlapping.length
+            : (currentIdx + 1) % overlapping.length;
+          selectedItem = overlapping[nextIdx];
+          selectedRoom = null;
+          draw();
+          const label = selectedItem.label || (ITEM_DEFS[selectedItem.type] ? ITEM_DEFS[selectedItem.type].label : selectedItem.type) || '';
+          updateStatus(`選択: ${label}（Tab で切替 ${nextIdx + 1}/${overlapping.length}）`);
+        }
+      }
+      return;
+    }
+
     if (selectedItem) {
       switch (e.key) {
         case 'Delete': case 'Backspace':
@@ -2634,7 +3110,14 @@
   });
   document.getElementById('btn-rect-room').addEventListener('click', () => {
     if (drawMode) cancelDrawMode();
+    if (lineMode) cancelLineMode();
     if (rectMode) cancelRectMode(); else startRectMode();
+  });
+
+  document.getElementById('btn-draw-line').addEventListener('click', () => {
+    if (drawMode) cancelDrawMode();
+    if (rectMode) cancelRectMode();
+    if (lineMode) cancelLineMode(); else startLineMode();
   });
 
   document.getElementById('btn-save').addEventListener('click', () => {
@@ -2677,13 +3160,61 @@
     selectedItem = null;
     selectedRoom = null;
     canvas._pdfExporting = true;
-    // Reset view for PDF export (show full diagram at 100%)
+    // Save current view
     const prevScale = viewScale;
     const prevOffsetX = viewOffsetX;
     const prevOffsetY = viewOffsetY;
-    viewScale = 1;
-    viewOffsetX = 0;
-    viewOffsetY = 0;
+
+    // Calculate bounding box of all content (rooms + items)
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const room of rooms) {
+      for (const p of room.points) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    for (const item of items) {
+      const ix = item.x, iy = item.y;
+      const iw = item.w || 0, ih = item.h || 0;
+      if (ix < minX) minX = ix;
+      if (iy < minY) minY = iy;
+      if (ix + iw > maxX) maxX = ix + iw;
+      if (iy + ih > maxY) maxY = iy + ih;
+    }
+
+    // If no content, use default view
+    if (!isFinite(minX)) {
+      minX = 0; minY = 0; maxX = canvas.width; maxY = canvas.height;
+    }
+
+    // Add padding around content
+    const padding = 40;
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+
+    // High-resolution rendering for crisp PDF output
+    const hiresScale = 3;
+
+    // Temporarily resize canvas to high resolution for sharp rendering
+    const origCanvasW = canvas.width;
+    const origCanvasH = canvas.height;
+    canvas.width = origCanvasW * hiresScale;
+    canvas.height = origCanvasH * hiresScale;
+
+    // Fit content to high-res canvas
+    const fitScaleX = canvas.width / contentW;
+    const fitScaleY = canvas.height / contentH;
+    viewScale = Math.min(fitScaleX, fitScaleY);
+    viewOffsetX = -minX * viewScale + (canvas.width - contentW * viewScale) / 2;
+    viewOffsetY = -minY * viewScale + (canvas.height - contentH * viewScale) / 2;
+
     draw();
 
     const userName = document.getElementById('user-name').value || '';
@@ -2692,40 +3223,46 @@
     const now = new Date();
     const dateStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`;
 
-    // Create a temporary canvas with user info + floor plan
+    // Create temp canvas with header info + floor plan
     const margin = 60;
     const headerH = 80;
     const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width + margin * 2;
-    tempCanvas.height = canvas.height + headerH + margin * 2;
+    tempCanvas.width = canvas.width + margin * 2 * hiresScale;
+    tempCanvas.height = canvas.height + headerH * hiresScale + margin * 2 * hiresScale;
     const tCtx = tempCanvas.getContext('2d');
 
     // White background
     tCtx.fillStyle = '#fff';
     tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
+    // Scale text rendering for hi-res
+    tCtx.save();
+    tCtx.scale(hiresScale, hiresScale);
+    const logicalW = tempCanvas.width / hiresScale;
+    const logicalH = tempCanvas.height / hiresScale;
+
     // Title (right side of header)
-    tCtx.fillStyle = '#333';
+    tCtx.fillStyle = '#000';
     tCtx.font = 'bold 24px "Hiragino Sans", "Meiryo", sans-serif';
     tCtx.textAlign = 'right';
-    tCtx.fillText('平面図', tempCanvas.width - margin, 36);
+    tCtx.fillText('平面図', logicalW - 60, 36);
 
     // User info (top-left)
-    tCtx.font = '16px "Hiragino Sans", "Meiryo", sans-serif';
+    tCtx.font = 'bold 16px "Hiragino Sans", "Meiryo", sans-serif';
     tCtx.textAlign = 'left';
-    tCtx.fillStyle = '#333';
+    tCtx.fillStyle = '#000';
     let infoY = 30;
-    if (userName) { tCtx.fillText(`名前: ${userName}`, margin, infoY); infoY += 22; }
-    if (userZip) { tCtx.fillText(`〒 ${userZip}`, margin, infoY); infoY += 22; }
-    if (userAddress) { tCtx.fillText(`住所: ${userAddress}`, margin, infoY); infoY += 22; }
+    if (userName) { tCtx.fillText(`名前: ${userName}`, 60, infoY); infoY += 22; }
+    if (userZip) { tCtx.fillText(`〒 ${userZip}`, 60, infoY); infoY += 22; }
+    if (userAddress) { tCtx.fillText(`住所: ${userAddress}`, 60, infoY); infoY += 22; }
 
     // 記入欄の内容 (center of header, wraps to next column if too many lines)
     if (railLegendText) {
       tCtx.textAlign = 'left';
-      tCtx.font = '16px "Hiragino Sans", "Meiryo", sans-serif';
+      tCtx.font = 'bold 16px "Hiragino Sans", "Meiryo", sans-serif';
       tCtx.fillStyle = '#e94560';
-      const legendStartX = tempCanvas.width * 0.35;
-      const columnWidth = tempCanvas.width * 0.2;
+      const legendStartX = logicalW * 0.35;
+      const columnWidth = logicalW * 0.2;
       const maxLinesPerColumn = 3;
       const lineHeight = 22;
       let col = 0;
@@ -2743,22 +3280,23 @@
           }
         }
       });
-      tCtx.fillStyle = '#333';
+      tCtx.fillStyle = '#000';
     }
 
     // Date (top-right, below title)
     tCtx.textAlign = 'right';
     tCtx.font = '13px "Hiragino Sans", "Meiryo", sans-serif';
-    tCtx.fillStyle = '#333';
-    tCtx.fillText(`作成日: ${dateStr}`, tempCanvas.width - margin, 56);
+    tCtx.fillStyle = '#000';
+    tCtx.fillText(`作成日: ${dateStr}`, logicalW - 60, 56);
 
-    // Draw the floor plan canvas
-    tCtx.drawImage(canvas, margin, headerH);
+    // Draw the floor plan canvas (high-res)
+    tCtx.restore(); // Undo the scale for drawing the image at native resolution
+    tCtx.drawImage(canvas, margin * hiresScale, headerH * hiresScale);
 
-    // Border around the plan
-    tCtx.strokeStyle = '#ccc';
-    tCtx.lineWidth = 1;
-    tCtx.strokeRect(margin, headerH, canvas.width, canvas.height);
+    // Border around the plan (at hi-res pixel coords)
+    tCtx.strokeStyle = '#999';
+    tCtx.lineWidth = 2;
+    tCtx.strokeRect(margin * hiresScale, headerH * hiresScale, canvas.width, canvas.height);
 
     // Generate PDF using jsPDF with image
     const { jsPDF } = window.jspdf;
@@ -2766,15 +3304,35 @@
 
     const imgData = tempCanvas.toDataURL('image/png');
     // A4 landscape: 297 x 210 mm
-    const pdfW = 287; // with some margin
-    const pdfH = (tempCanvas.height / tempCanvas.width) * pdfW;
-    const finalH = Math.min(pdfH, 200);
-    const finalW = (finalH / pdfH) * pdfW;
+    // Use uniform margins on all sides for clean centering
+    const pdfPageW = 297;
+    const pdfPageH = 210;
+    const pdfMargin = 5; // mm margin on each side
+    const availW = pdfPageW - pdfMargin * 2;
+    const availH = pdfPageH - pdfMargin * 2;
 
-    pdf.addImage(imgData, 'PNG', (297 - finalW) / 2, (210 - finalH) / 2, finalW, finalH);
+    // Fit image to available area while maintaining aspect ratio
+    const imgAspect = tempCanvas.width / tempCanvas.height;
+    const availAspect = availW / availH;
+    let finalW, finalH;
+    if (imgAspect > availAspect) {
+      finalW = availW;
+      finalH = availW / imgAspect;
+    } else {
+      finalH = availH;
+      finalW = availH * imgAspect;
+    }
+
+    // Center on page
+    const imgX = (pdfPageW - finalW) / 2;
+    const imgY = (pdfPageH - finalH) / 2;
+
+    pdf.addImage(imgData, 'PNG', imgX, imgY, finalW, finalH);
     pdf.save('floorplan.pdf');
 
-    // Restore selection and view transform
+    // Restore canvas size and view transform
+    canvas.width = origCanvasW;
+    canvas.height = origCanvasH;
     canvas._pdfExporting = false;
     viewScale = prevScale;
     viewOffsetX = prevOffsetX;
@@ -2794,7 +3352,20 @@
     selectedItem = null;
     selectedRoom = null;
     canvas._pdfExporting = true;
-    // Keep current view transform as-is
+
+    // High-res rendering: scale up canvas
+    const hiresScale = 3;
+    const origCanvasW = canvas.width;
+    const origCanvasH = canvas.height;
+    const prevScale = viewScale;
+    const prevOffsetX = viewOffsetX;
+    const prevOffsetY = viewOffsetY;
+
+    canvas.width = origCanvasW * hiresScale;
+    canvas.height = origCanvasH * hiresScale;
+    viewScale = prevScale * hiresScale;
+    viewOffsetX = prevOffsetX * hiresScale;
+    viewOffsetY = prevOffsetY * hiresScale;
     draw();
 
     const userName = document.getElementById('user-name').value || '';
@@ -2806,21 +3377,27 @@
     const margin = 60;
     const headerH = 80;
     const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width + margin * 2;
-    tempCanvas.height = canvas.height + headerH + margin * 2;
+    tempCanvas.width = canvas.width + margin * 2 * hiresScale;
+    tempCanvas.height = canvas.height + headerH * hiresScale + margin * 2 * hiresScale;
     const tCtx = tempCanvas.getContext('2d');
 
     tCtx.fillStyle = '#fff';
     tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-    tCtx.fillStyle = '#333';
+    // Scale for text rendering
+    tCtx.save();
+    tCtx.scale(hiresScale, hiresScale);
+    const logicalW = tempCanvas.width / hiresScale;
+    const logicalH = tempCanvas.height / hiresScale;
+
+    tCtx.fillStyle = '#000';
     tCtx.font = 'bold 24px "Hiragino Sans", "Meiryo", sans-serif';
     tCtx.textAlign = 'right';
-    tCtx.fillText(`平面図 (${Math.round(viewScale * 100)}%)`, tempCanvas.width - margin, 36);
+    tCtx.fillText(`平面図 (${Math.round(prevScale * 100)}%)`, logicalW - margin, 36);
 
-    tCtx.font = '16px "Hiragino Sans", "Meiryo", sans-serif';
+    tCtx.font = 'bold 16px "Hiragino Sans", "Meiryo", sans-serif';
     tCtx.textAlign = 'left';
-    tCtx.fillStyle = '#333';
+    tCtx.fillStyle = '#000';
     let infoY = 30;
     if (userName) { tCtx.fillText(`名前: ${userName}`, margin, infoY); infoY += 22; }
     if (userZip) { tCtx.fillText(`〒 ${userZip}`, margin, infoY); infoY += 22; }
@@ -2828,10 +3405,10 @@
 
     if (railLegendText) {
       tCtx.textAlign = 'left';
-      tCtx.font = '16px "Hiragino Sans", "Meiryo", sans-serif';
+      tCtx.font = 'bold 16px "Hiragino Sans", "Meiryo", sans-serif';
       tCtx.fillStyle = '#e94560';
-      const legendStartX = tempCanvas.width * 0.35;
-      const columnWidth = tempCanvas.width * 0.2;
+      const legendStartX = logicalW * 0.35;
+      const columnWidth = logicalW * 0.2;
       const maxLinesPerColumn = 3;
       const lineHeight = 22;
       let col = 0;
@@ -2846,38 +3423,60 @@
           if (row >= maxLinesPerColumn) { row = 0; col++; }
         }
       });
-      tCtx.fillStyle = '#333';
+      tCtx.fillStyle = '#000';
     }
 
     tCtx.textAlign = 'right';
     tCtx.font = '13px "Hiragino Sans", "Meiryo", sans-serif';
-    tCtx.fillStyle = '#333';
-    tCtx.fillText(`作成日: ${dateStr}`, tempCanvas.width - margin, 56);
+    tCtx.fillStyle = '#000';
+    tCtx.fillText(`作成日: ${dateStr}`, logicalW - margin, 56);
+    tCtx.restore();
 
-    tCtx.drawImage(canvas, margin, headerH);
+    // Draw high-res canvas
+    tCtx.drawImage(canvas, margin * hiresScale, headerH * hiresScale);
 
-    tCtx.strokeStyle = '#ccc';
-    tCtx.lineWidth = 1;
-    tCtx.strokeRect(margin, headerH, canvas.width, canvas.height);
+    tCtx.strokeStyle = '#999';
+    tCtx.lineWidth = 2;
+    tCtx.strokeRect(margin * hiresScale, headerH * hiresScale, canvas.width, canvas.height);
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
     const imgData = tempCanvas.toDataURL('image/png');
-    const pdfW = 287;
-    const pdfH = (tempCanvas.height / tempCanvas.width) * pdfW;
-    const finalH = Math.min(pdfH, 200);
-    const finalW = (finalH / pdfH) * pdfW;
+    // A4 landscape: 297 x 210 mm - uniform centering
+    const pdfPageW = 297;
+    const pdfPageH = 210;
+    const pdfMargin = 5;
+    const availW = pdfPageW - pdfMargin * 2;
+    const availH = pdfPageH - pdfMargin * 2;
+    const imgAspect = tempCanvas.width / tempCanvas.height;
+    const availAspect = availW / availH;
+    let finalW, finalH;
+    if (imgAspect > availAspect) {
+      finalW = availW;
+      finalH = availW / imgAspect;
+    } else {
+      finalH = availH;
+      finalW = availH * imgAspect;
+    }
+    const imgX = (pdfPageW - finalW) / 2;
+    const imgY = (pdfPageH - finalH) / 2;
 
-    pdf.addImage(imgData, 'PNG', (297 - finalW) / 2, (210 - finalH) / 2, finalW, finalH);
+    pdf.addImage(imgData, 'PNG', imgX, imgY, finalW, finalH);
     pdf.save('floorplan_zoomed.pdf');
 
+    // Restore canvas size and view
+    canvas.width = origCanvasW;
+    canvas.height = origCanvasH;
     canvas._pdfExporting = false;
+    viewScale = prevScale;
+    viewOffsetX = prevOffsetX;
+    viewOffsetY = prevOffsetY;
     selectedItem = prevSelectedItem;
     selectedRoom = prevSelectedRoom;
     draw();
 
-    updateStatus(`PDF（${Math.round(viewScale * 100)}%表示）を書き出しました`);
+    updateStatus(`PDF（${Math.round(prevScale * 100)}%表示）を書き出しました`);
     showPenguinMessage();
   });
 

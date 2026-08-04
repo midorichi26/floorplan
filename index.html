@@ -18,6 +18,13 @@
         <button id="btn-draw-room" title="フリーハンドで部屋を描く">✏️ フリーハンド</button>
         <button id="btn-rect-room" title="四角で部屋を描く">⬜ 四角で描く</button>
         <button id="btn-draw-line" title="直線を引く">📏 直線</button>
+        <select id="line-width" title="直線の太さ" style="padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:0.8rem;">
+          <option value="1">細(1px)</option>
+          <option value="2">中(2px)</option>
+          <option value="3" selected>標準(3px)</option>
+          <option value="5">太(5px)</option>
+          <option value="7">極太(7px)</option>
+        </select>
         <button id="btn-zoom-in" title="図面を拡大">🔍+ 拡大</button>
         <button id="btn-zoom-out" title="図面を縮小">🔍- 縮小</button>
         <button id="btn-zoom-reset" title="表示リセット (Ctrl+0)">↺ リセット</button>
@@ -212,10 +219,14 @@
         </div>
         <div id="rail-legend" class="rail-legend"></div>
         <div id="context-menu" class="context-menu hidden">
+          <div id="ctx-drag-handle" class="ctx-drag-handle">⋮⋮ ドラッグで移動</div>
           <button id="ctx-rotate">↻ 回転</button>
+          <button id="ctx-flip-h">↔ 左右反転</button>
+          <button id="ctx-flip-v">↕ 上下反転</button>
           <button id="ctx-resize-up">⬆ 大きく</button>
           <button id="ctx-resize-down">⬇ 小さく</button>
           <button id="ctx-hatch">⧄ 斜線ON/OFF</button>
+          <button id="ctx-toggle-edge">🚫 辺を消す/表示</button>
           <div class="ctx-color-row">
             <span style="font-size:0.8rem;padding:4px 8px;">色:</span>
             <button class="ctx-color-btn" data-color="#333333" style="background:#333333;" title="黒"></button>
@@ -224,6 +235,12 @@
             <button class="ctx-color-btn" data-color="#4CAF50" style="background:#4CAF50;" title="緑"></button>
             <button class="ctx-color-btn" data-color="#FF9800" style="background:#FF9800;" title="オレンジ"></button>
             <button class="ctx-color-btn" data-color="#9C27B0" style="background:#9C27B0;" title="紫"></button>
+          </div>
+          <div class="ctx-label-row" id="ctx-line-width-controls" style="display:none;">
+            <span style="font-size:0.8rem;padding:4px 8px;">線幅:</span>
+            <button id="ctx-line-thin" title="細く">−</button>
+            <span id="ctx-line-width-display" style="font-size:0.75rem;min-width:24px;text-align:center;">3</span>
+            <button id="ctx-line-thick" title="太く">＋</button>
           </div>
           <div class="ctx-label-row" id="ctx-label-controls">
             <span style="font-size:0.8rem;padding:4px 8px;">文字:</span>
@@ -239,6 +256,13 @@
           <button id="ctx-delete">❌ 削除</button>
         </div>
         <button id="btn-edit-item" class="edit-item-btn" style="display:none;">✏️ 編集</button>
+        <!-- Custom scrollbars -->
+        <div id="scrollbar-v" class="custom-scrollbar vertical">
+          <div id="scrollbar-v-thumb" class="scrollbar-thumb"></div>
+        </div>
+        <div id="scrollbar-h" class="custom-scrollbar horizontal">
+          <div id="scrollbar-h-thumb" class="scrollbar-thumb"></div>
+        </div>
       </main>
     </div>
 
