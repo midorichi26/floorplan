@@ -330,6 +330,9 @@ body {
   z-index: 100;
   box-shadow: 0 4px 16px rgba(0,0,0,0.1);
   pointer-events: auto;
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .context-menu.hidden {
@@ -981,4 +984,24 @@ body {
     padding: 12px 20px;
     font-size: 1rem;
   }
+}
+
+
+/* Context menu scrollbar styling */
+.context-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.context-menu::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.context-menu::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.context-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
 }
