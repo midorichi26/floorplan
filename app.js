@@ -2645,33 +2645,55 @@
     let menuDragStart = { x: 0, y: 0 };
     let menuStartPos = { x: 0, y: 0 };
 
-    dragHandle.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    function startDrag(clientX, clientY) {
       isDraggingMenu = true;
-      menuDragStart = { x: e.clientX, y: e.clientY };
+      menuDragStart = { x: clientX, y: clientY };
       menuStartPos = {
         x: parseInt(contextMenu.style.left) || 0,
         y: parseInt(contextMenu.style.top) || 0
       };
+    }
+
+    function moveDrag(clientX, clientY) {
+      if (!isDraggingMenu) return;
+      const dx = clientX - menuDragStart.x;
+      const dy = clientY - menuDragStart.y;
+      contextMenu.style.left = (menuStartPos.x + dx) + 'px';
+      contextMenu.style.top = (menuStartPos.y + dy) + 'px';
+      contextMenuUserMoved = true;
+    }
+
+    function endDrag() {
+      isDraggingMenu = false;
+      dragHandle.style.cursor = 'grab';
+    }
+
+    // Mouse events
+    dragHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startDrag(e.clientX, e.clientY);
       dragHandle.style.cursor = 'grabbing';
     });
 
-    document.addEventListener('mousemove', (e) => {
-      if (!isDraggingMenu) return;
-      const dx = e.clientX - menuDragStart.x;
-      const dy = e.clientY - menuDragStart.y;
-      contextMenu.style.left = (menuStartPos.x + dx) + 'px';
-      contextMenu.style.top = (menuStartPos.y + dy) + 'px';
-      contextMenuUserMoved = true; // User has manually positioned the menu
-    });
+    document.addEventListener('mousemove', (e) => { moveDrag(e.clientX, e.clientY); });
+    document.addEventListener('mouseup', () => { if (isDraggingMenu) endDrag(); });
 
-    document.addEventListener('mouseup', () => {
-      if (isDraggingMenu) {
-        isDraggingMenu = false;
-        dragHandle.style.cursor = 'grab';
-      }
-    });
+    // Touch events
+    dragHandle.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const touch = e.touches[0];
+      startDrag(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!isDraggingMenu) return;
+      const touch = e.touches[0];
+      moveDrag(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    document.addEventListener('touchend', () => { if (isDraggingMenu) endDrag(); });
   })();
 
   // Context menu is now hidden by default; shown only on demand
