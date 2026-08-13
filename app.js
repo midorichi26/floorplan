@@ -4112,6 +4112,133 @@
   userAddressEl.addEventListener('input', () => localStorage.setItem('floorplan-user-address', userAddressEl.value));
 
   // === Init ===
+  // === Touch events for iPad/tablet support ===
+  (function() {
+    let lastTouchCount = 0;
+    let pinchStartDist = 0;
+    let pinchStartScale = 1;
+    let panStartX = 0, panStartY = 0;
+    let panStartOffsetX = 0, panStartOffsetY = 0;
+    let touchStartTime = 0;
+    let singleTouchTimer = null;
+
+    // Prevent default browser touch behaviors on canvas
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
+    canvas.addEventListener('touchend', (e) => { e.preventDefault(); }, { passive: false });
+
+    function getTouchPos(touch) {
+      const rect = canvas.getBoundingClientRect();
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+    }
+
+    function getPinchDist(t1, t2) {
+      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    }
+
+    function getPinchCenter(t1, t2) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (t1.clientX + t2.clientX) / 2 - rect.left,
+        y: (t1.clientY + t2.clientY) / 2 - rect.top,
+      };
+    }
+
+    canvas.addEventListener('touchstart', (e) => {
+      const touches = e.touches;
+      lastTouchCount = touches.length;
+
+      if (touches.length === 2) {
+        // Pinch zoom / 2-finger pan start
+        pinchStartDist = getPinchDist(touches[0], touches[1]);
+        pinchStartScale = viewScale;
+        const center = getPinchCenter(touches[0], touches[1]);
+        panStartX = center.x;
+        panStartY = center.y;
+        panStartOffsetX = viewOffsetX;
+        panStartOffsetY = viewOffsetY;
+        return;
+      }
+
+      if (touches.length === 1) {
+        // Single finger: simulate mousedown
+        const pos = getTouchPos(touches[0]);
+        touchStartTime = Date.now();
+        const mouseEvent = new MouseEvent('mousedown', {
+          clientX: touches[0].clientX,
+          clientY: touches[0].clientY,
+          button: 0,
+        });
+        canvas.dispatchEvent(mouseEvent);
+      }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      const touches = e.touches;
+
+      if (touches.length === 2) {
+        // Pinch zoom
+        const dist = getPinchDist(touches[0], touches[1]);
+        const scale = pinchStartScale * (dist / pinchStartDist);
+        const clampedScale = Math.max(0.25, Math.min(5, scale));
+
+        // Pan with 2 fingers
+        const center = getPinchCenter(touches[0], touches[1]);
+        const dx = center.x - panStartX;
+        const dy = center.y - panStartY;
+
+        // Zoom towards pinch center
+        const factor = clampedScale / viewScale;
+        viewOffsetX = center.x - (center.x - viewOffsetX) * factor + dx * 0.5;
+        viewOffsetY = center.y - (center.y - viewOffsetY) * factor + dy * 0.5;
+        viewScale = clampedScale;
+
+        panStartX = center.x;
+        panStartY = center.y;
+        draw();
+        return;
+      }
+
+      if (touches.length === 1) {
+        // Single finger: simulate mousemove
+        const mouseEvent = new MouseEvent('mousemove', {
+          clientX: touches[0].clientX,
+          clientY: touches[0].clientY,
+          button: 0,
+        });
+        canvas.dispatchEvent(mouseEvent);
+      }
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (e.touches.length === 0) {
+        // All fingers lifted: simulate mouseup
+        const touch = e.changedTouches[0];
+        const mouseEvent = new MouseEvent('mouseup', {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+          button: 0,
+        });
+        canvas.dispatchEvent(mouseEvent);
+
+        // Double-tap detection for context menu
+        const now = Date.now();
+        if (singleTouchTimer && now - touchStartTime < 300) {
+          // Double tap
+          const dblEvent = new MouseEvent('dblclick', {
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+          });
+          canvas.dispatchEvent(dblEvent);
+          singleTouchTimer = null;
+        } else {
+          singleTouchTimer = setTimeout(() => { singleTouchTimer = null; }, 300);
+        }
+      }
+      lastTouchCount = e.touches.length;
+    });
+  })();
+
   resizeCanvas();
   updateUndoButtons();
   renderSavedPlans();
