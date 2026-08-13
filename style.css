@@ -370,6 +370,8 @@ body {
   user-select: none;
   border-radius: 6px 6px 0 0;
   background: var(--btn-bg);
+  touch-action: none;
+  -webkit-user-select: none;
 }
 
 .ctx-drag-handle:active {

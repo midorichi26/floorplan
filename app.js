@@ -2665,7 +2665,6 @@
 
     function endDrag() {
       isDraggingMenu = false;
-      dragHandle.style.cursor = 'grab';
     }
 
     // Mouse events
@@ -2673,27 +2672,34 @@
       e.preventDefault();
       e.stopPropagation();
       startDrag(e.clientX, e.clientY);
-      dragHandle.style.cursor = 'grabbing';
     });
 
     document.addEventListener('mousemove', (e) => { moveDrag(e.clientX, e.clientY); });
     document.addEventListener('mouseup', () => { if (isDraggingMenu) endDrag(); });
 
-    // Touch events
-    dragHandle.addEventListener('touchstart', (e) => {
+    // Touch events - directly on dragHandle to avoid conflicts with menu scroll
+    dragHandle.addEventListener('touchstart', function(e) {
       e.preventDefault();
       e.stopPropagation();
       const touch = e.touches[0];
       startDrag(touch.clientX, touch.clientY);
     }, { passive: false });
 
-    document.addEventListener('touchmove', (e) => {
+    dragHandle.addEventListener('touchmove', function(e) {
       if (!isDraggingMenu) return;
+      e.preventDefault();
+      e.stopPropagation();
       const touch = e.touches[0];
       moveDrag(touch.clientX, touch.clientY);
     }, { passive: false });
 
-    document.addEventListener('touchend', () => { if (isDraggingMenu) endDrag(); });
+    dragHandle.addEventListener('touchend', function(e) {
+      if (isDraggingMenu) {
+        e.preventDefault();
+        e.stopPropagation();
+        endDrag();
+      }
+    }, { passive: false });
   })();
 
   // Context menu is now hidden by default; shown only on demand
