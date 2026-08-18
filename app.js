@@ -3228,7 +3228,7 @@
     const contentH = maxY - minY;
 
     // High-resolution rendering for crisp PDF output
-    const hiresScale = 3;
+    const hiresScale = 2;
 
     // Temporarily resize canvas to high resolution for sharp rendering
     const origCanvasW = canvas.width;
@@ -3330,7 +3330,7 @@
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-    const imgData = tempCanvas.toDataURL('image/png');
+    const imgData = tempCanvas.toDataURL('image/jpeg', 0.92);
     // A4 landscape: 297 x 210 mm
     // Use uniform margins on all sides for clean centering
     const pdfPageW = 297;
@@ -3355,7 +3355,7 @@
     const imgX = (pdfPageW - finalW) / 2;
     const imgY = (pdfPageH - finalH) / 2;
 
-    pdf.addImage(imgData, 'PNG', imgX, imgY, finalW, finalH);
+    pdf.addImage(imgData, 'JPEG', imgX, imgY, finalW, finalH);
     pdf.save('floorplan.pdf');
 
     // Restore canvas size and view transform
@@ -3382,7 +3382,7 @@
     canvas._pdfExporting = true;
 
     // High-res rendering: scale up canvas
-    const hiresScale = 3;
+    const hiresScale = 2;
     const origCanvasW = canvas.width;
     const origCanvasH = canvas.height;
     const prevScale = viewScale;
@@ -3470,7 +3470,7 @@
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-    const imgData = tempCanvas.toDataURL('image/png');
+    const imgData = tempCanvas.toDataURL('image/jpeg', 0.92);
     // A4 landscape: 297 x 210 mm - uniform centering
     const pdfPageW = 297;
     const pdfPageH = 210;
@@ -3490,7 +3490,7 @@
     const imgX = (pdfPageW - finalW) / 2;
     const imgY = (pdfPageH - finalH) / 2;
 
-    pdf.addImage(imgData, 'PNG', imgX, imgY, finalW, finalH);
+    pdf.addImage(imgData, 'JPEG', imgX, imgY, finalW, finalH);
     pdf.save('floorplan_zoomed.pdf');
 
     // Restore canvas size and view
