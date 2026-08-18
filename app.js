@@ -123,6 +123,31 @@
     document.getElementById('btn-redo').disabled = redoStack.length === 0;
   }
 
+  // === Auto-backup before PDF export ===
+  function autoBackupBeforePDF() {
+    try {
+      const now = new Date();
+      const timestamp = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
+      const backupData = JSON.stringify({ gridSize, items, rooms, backupTime: now.toISOString() });
+      
+      // Save to LocalStorage with rotating backup (keep last 5)
+      const backupKey = `floorplan_backup_${timestamp}`;
+      localStorage.setItem(backupKey, backupData);
+      
+      // Keep only last 5 backups
+      const allKeys = Object.keys(localStorage).filter(k => k.startsWith('floorplan_backup_'));
+      if (allKeys.length > 5) {
+        allKeys.sort();
+        const toRemove = allKeys.slice(0, allKeys.length - 5);
+        toRemove.forEach(k => localStorage.removeItem(k));
+      }
+      
+      console.log(`[自動バックアップ] ${backupKey} に保存しました`);
+    } catch (e) {
+      console.warn('自動バックアップに失敗しました:', e);
+    }
+  }
+
   // Room colors
   const ROOM_COLORS = [
     'rgba(173, 216, 230, 0.3)',
@@ -3180,6 +3205,9 @@
   });
 
   document.getElementById('btn-export').addEventListener('click', () => {
+    // Auto-backup: save JSON to LocalStorage before PDF export
+    autoBackupBeforePDF();
+
     // Export as PDF - render everything including Japanese text onto a temp canvas, then embed as image
     // Temporarily deselect everything so selection highlights/dashes don't appear in PDF
     // Also hide background image from PDF
@@ -3375,6 +3403,9 @@
 
   // === PDF export with current zoom/pan (拡大表示のままPDF化) ===
   document.getElementById('btn-export-zoom').addEventListener('click', () => {
+    // Auto-backup: save JSON to LocalStorage before PDF export
+    autoBackupBeforePDF();
+
     const prevSelectedItem = selectedItem;
     const prevSelectedRoom = selectedRoom;
     selectedItem = null;
@@ -3995,31 +4026,60 @@
     list.innerHTML = '';
     if (plans.length === 0) {
       list.innerHTML = '<div style="font-size:0.78rem;color:var(--text-light);padding:4px 0;">保存された図面はありません</div>';
-      return;
+    } else {
+      plans.forEach((plan, idx) => {
+        const el = document.createElement('div');
+        el.className = 'saved-plan-item';
+        el.innerHTML = `<span class="plan-name" title="${plan.name}">${plan.name}</span><span class="plan-date">${plan.date}</span><button class="plan-delete" title="削除">×</button>`;
+        el.querySelector('.plan-name').addEventListener('click', () => {
+          if (confirm(`「${plan.name}」を読み込みますか？\n（現在の図面は上書きされます）`)) {
+            loadPlanData(plan.data);
+            updateStatus(`「${plan.name}」を読み込みました`);
+          }
+        });
+        el.querySelector('.plan-delete').addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (confirm(`「${plan.name}」を削除しますか？`)) {
+            const plans = getSavedPlans();
+            plans.splice(idx, 1);
+            savePlansList(plans);
+            renderSavedPlans();
+          }
+        });
+        list.appendChild(el);
+      });
     }
-    plans.forEach((plan, idx) => {
-      const el = document.createElement('div');
-      el.className = 'saved-plan-item';
-      el.innerHTML = `<span class="plan-name" title="${plan.name}">${plan.name}</span><span class="plan-date">${plan.date}</span><button class="plan-delete" title="削除">×</button>`;
-      // Click to load
-      el.querySelector('.plan-name').addEventListener('click', () => {
-        if (confirm(`「${plan.name}」を読み込みますか？\n（現在の図面は上書きされます）`)) {
-          loadPlanData(plan.data);
-          updateStatus(`「${plan.name}」を読み込みました`);
-        }
+
+    // Show auto-backups (from PDF export)
+    const backupKeys = Object.keys(localStorage).filter(k => k.startsWith('floorplan_backup_')).sort().reverse();
+    if (backupKeys.length > 0) {
+      const header = document.createElement('div');
+      header.style.cssText = 'font-size:0.72rem;color:var(--text-light);margin-top:10px;padding:2px 0;border-top:1px solid var(--border);';
+      header.textContent = '📦 自動バックアップ（PDF書出時）';
+      list.appendChild(header);
+
+      backupKeys.forEach(key => {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          const dateStr = data.backupTime ? new Date(data.backupTime).toLocaleString('ja-JP', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : key.replace('floorplan_backup_', '');
+          const el = document.createElement('div');
+          el.className = 'saved-plan-item';
+          el.innerHTML = `<span class="plan-name" title="${key}">📦 ${dateStr}</span><button class="plan-delete" title="削除">×</button>`;
+          el.querySelector('.plan-name').addEventListener('click', () => {
+            if (confirm(`バックアップ（${dateStr}）を読み込みますか？\n（現在の図面は上書きされます）`)) {
+              loadPlanData(data);
+              updateStatus(`バックアップ（${dateStr}）を復元しました`);
+            }
+          });
+          el.querySelector('.plan-delete').addEventListener('click', (e) => {
+            e.stopPropagation();
+            localStorage.removeItem(key);
+            renderSavedPlans();
+          });
+          list.appendChild(el);
+        } catch(e) {}
       });
-      // Delete
-      el.querySelector('.plan-delete').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm(`「${plan.name}」を削除しますか？`)) {
-          const plans = getSavedPlans();
-          plans.splice(idx, 1);
-          savePlansList(plans);
-          renderSavedPlans();
-        }
-      });
-      list.appendChild(el);
-    });
+    }
   }
 
   function loadPlanData(data) {
