@@ -3311,7 +3311,8 @@
     tCtx.fillStyle = '#000';
     tCtx.font = 'bold 24px "Hiragino Sans", "Meiryo", sans-serif';
     tCtx.textAlign = 'right';
-    tCtx.fillText('平面図', logicalW - 60, 36);
+    const pdfTitle = document.getElementById('pdf-title').value || '平面図';
+    tCtx.fillText(pdfTitle, logicalW - 60, 36);
 
     // User info (top-left)
     tCtx.font = 'bold 16px "Hiragino Sans", "Meiryo", sans-serif';
@@ -3462,7 +3463,8 @@
     tCtx.fillStyle = '#000';
     tCtx.font = 'bold 24px "Hiragino Sans", "Meiryo", sans-serif';
     tCtx.textAlign = 'right';
-    tCtx.fillText(`平面図 (${Math.round(prevScale * 100)}%)`, logicalW - margin, 36);
+    const pdfTitle = document.getElementById('pdf-title').value || '平面図';
+    tCtx.fillText(`${pdfTitle} (${Math.round(prevScale * 100)}%)`, logicalW - margin, 36);
 
     tCtx.font = 'bold 16px "Hiragino Sans", "Meiryo", sans-serif';
     tCtx.textAlign = 'left';
