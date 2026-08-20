@@ -2282,8 +2282,10 @@
         };
         items.push(newItem);
         selectedItem = newItem;
+        // Auto-exit line mode after drawing
+        cancelLineMode();
         draw();
-        updateStatus('直線を描きました。続けてドラッグで次の線を引けます。');
+        updateStatus('直線を描きました');
       }
       lineStart = null;
       lineEnd = null;
@@ -2464,7 +2466,10 @@
       rooms.push(room); roomColorIndex++; selectedRoom = room;
       updateStatus(`「${room.label}」を作成しました`);
     }
-    currentRoomPoints = []; isTracing = false; draw();
+    currentRoomPoints = []; isTracing = false;
+    // Auto-exit draw mode after finishing
+    cancelDrawMode();
+    draw();
   }
 
   function cancelDrawMode() {
@@ -2493,7 +2498,10 @@
     const label = prompt('部屋名を入力してください（空欄で無地）', '');
     const room = { points, color: 'rgba(255,255,255,0)', label: label || '' };
     rooms.push(room); roomColorIndex++; selectedRoom = room;
-    rectStart = null; rectEnd = null; draw();
+    rectStart = null; rectEnd = null;
+    // Auto-exit rect mode after drawing
+    cancelRectMode();
+    draw();
     updateStatus(`「${room.label}」を作成しました`);
   }
 
