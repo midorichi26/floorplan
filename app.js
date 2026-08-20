@@ -4335,6 +4335,24 @@
     });
   })();
 
+  // === Deselect when clicking outside canvas (sidebar, toolbar, etc.) ===
+  document.addEventListener('mousedown', (e) => {
+    // Only deselect if clicking outside the canvas and context menu
+    const isCanvas = canvas.contains(e.target);
+    const isContextMenu = contextMenu.contains(e.target);
+    const isEditBtn = e.target.id === 'btn-edit-item';
+    if (!isCanvas && !isContextMenu && !isEditBtn) {
+      if (selectedItem || selectedRoom) {
+        selectedItem = null;
+        selectedRoom = null;
+        contextMenuVisible = false;
+        hideContextMenu();
+        updateEditBtnVisibility();
+        draw();
+      }
+    }
+  });
+
   resizeCanvas();
   updateUndoButtons();
   renderSavedPlans();
