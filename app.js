@@ -2020,6 +2020,7 @@
       if (room) {
         selectedRoom = room;
         selectedItem = null;
+        edgeToggleMode = false; // Reset edge toggle when selecting a new room
 
         // Check if clicking near the label -> drag label instead of room
         if (room.label) {
@@ -2041,6 +2042,7 @@
       } else {
         selectedItem = null;
         selectedRoom = null;
+        edgeToggleMode = false;
         contextMenuVisible = false;
         hideContextMenu();
         updateEditBtnVisibility();
@@ -4345,6 +4347,7 @@
       if (selectedItem || selectedRoom) {
         selectedItem = null;
         selectedRoom = null;
+        edgeToggleMode = false;
         contextMenuVisible = false;
         hideContextMenu();
         updateEditBtnVisibility();
